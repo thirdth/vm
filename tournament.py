@@ -15,6 +15,7 @@ def deleteMatches():
     """Remove all the match records from the database."""
     conn = connect()
     c = conn.cursor()
+    # Clears the Matches table, but does not get rid of the table.
     posts = c.execute("delete from matches;")
     conn.commit()
     conn.close()
@@ -25,6 +26,7 @@ def deletePlayers():
     """Remove all the player records from the database."""
     conn = connect()
     c = conn.cursor()
+    # Clears the Players table, but does not get rid of the table.
     c.execute("delete from players;")
     conn.commit()
     conn.close()
@@ -34,6 +36,7 @@ def countPlayers():
     """Returns the number of players currently registered."""
     conn = connect()
     c = conn.cursor()
+    # Counts the number of entries in the Players table.
     posts = c.execute("select count(*) as num from players;")
     num = c.fetchone()[0]
     conn.commit()
@@ -52,6 +55,7 @@ def registerPlayer(name):
     """
     conn = connect()
     c = conn.cursor()
+    # Inserts a players name into the Players table.
     c.execute("INSERT INTO players (name) VALUES (%s);", (str(name), ))
     conn.commit()
 
@@ -70,6 +74,9 @@ def playerStandings():
     """
     conn = connect()
     c = conn.cursor()
+    """ The Query creates a view called Standings by connecting the
+    name and id in the Players table with how many wins that player has
+    and how many matches that player has played in the Matches table."""
     c.execute("CREATE or REPLACE VIEW standings AS\
         SELECT players.id, players.name,\
         (SELECT count(matches.winner_id)\
@@ -97,6 +104,7 @@ def reportMatch(winner, loser):
     """
     conn = connect()
     c = conn.cursor()
+    # Inserts "winner_id" and "loser_id" into the table "matches"
     c.execute("INSERT INTO matches (winner_id, loser_id) VALUES (%s,%s)", (winner, loser))
     conn.commit()
     conn.close()
@@ -119,6 +127,14 @@ def swissPairings():
     """
     conn = connect()
     c = conn.cursor()
+    """ This query makes three separate views; player_order, odd, and even.
+    Player_order sorts all the players according to their ranking and
+    gives them a row number, while Even and Odd create views from that
+    view which take every other player according to whether they have
+    odd or even row numbers and place them in those views in order
+    giving them a new number begining with 1. The query then joins
+    those two views based on the row number and returns two player
+    names and ids for each row."""
     c.execute("CREATE or REPLACE VIEW player_order AS\
     SELECT id, name, total_wins,\
     row_number() over(order by total_wins) as game\
