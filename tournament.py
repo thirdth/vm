@@ -4,29 +4,35 @@
 #
 
 import psycopg2
+import sys
 
 
 def connect():
-    """Connect to the PostgreSQL database.  Returns a database connection."""
-    return psycopg2.connect("dbname=tournament")
+    """Connect to the PostgreSQL database.  Returns a database connection, or
+    it prints the relevant error message."""
+    try:
+        return psycopg2.connect("dbname=tournament")
+
+    except:
+        print('An error occured connecting to the database "tournament".')
+        sys.exit()
 
 
 def deleteMatches():
     """Remove all the match records from the database."""
     conn = connect()
     c = conn.cursor()
-    # Clears the Matches table, but does not get rid of the table.
-    posts = c.execute("delete from matches;")
+    # Clears the "matches" table, but does not get rid of the table.
+    c.execute("delete from matches;")
     conn.commit()
     conn.close()
-    return posts
 
 
 def deletePlayers():
     """Remove all the player records from the database."""
     conn = connect()
     c = conn.cursor()
-    # Clears the Players table, but does not get rid of the table.
+    # Clears the "players" table, but does not get rid of the table.
     c.execute("delete from players;")
     conn.commit()
     conn.close()
@@ -36,8 +42,8 @@ def countPlayers():
     """Returns the number of players currently registered."""
     conn = connect()
     c = conn.cursor()
-    # Counts the number of entries in the Players table.
-    posts = c.execute("select count(*) as num from players;")
+    # Counts the number of entries in the "players" table.
+    c.execute("select count(*) as num from players;")
     num = c.fetchone()[0]
     conn.commit()
     conn.close()
@@ -55,14 +61,15 @@ def registerPlayer(name):
     """
     conn = connect()
     c = conn.cursor()
-    # Inserts a players name into the Players table.
+    # Inserts a players name into the "players" table.
     c.execute("INSERT INTO players (name) VALUES (%s);", (str(name), ))
     conn.commit()
+
 
 def playerStandings():
     """Returns a list of the players and their win records, sorted by wins.
 
-    The first entry in the list should be the player in first place, or a player
+    The first entry in the list should be the player in first place, or player
     tied for first place if there is currently a tie.
 
     Returns:
@@ -74,26 +81,12 @@ def playerStandings():
     """
     conn = connect()
     c = conn.cursor()
-    """ The Query creates a view called Standings by connecting the
-    name and id in the Players table with how many wins that player has
-    and how many matches that player has played in the Matches table."""
-    c.execute("CREATE or REPLACE VIEW standings AS\
-        SELECT players.id, players.name,\
-        (SELECT count(matches.winner_id)\
-        FROM matches\
-        WHERE players.id = matches.winner_id)\
-        AS total_wins,\
-        (SELECT count (matches.id)\
-        FROM matches\
-        WHERE players.id = matches.winner_id\
-        OR players.id = matches.loser_id)\
-        AS total_matches\
-        FROM players\
-        ORDER BY total_wins DESC, total_matches DESC;\
-        select * from standings;")
+    # Gets all the information from the view "standings".
+    c.execute("SELECT * from standings;")
     result = c.fetchall()
     conn.close()
     return result
+
 
 def reportMatch(winner, loser):
     """Records the outcome of a single match between two players.
@@ -105,7 +98,8 @@ def reportMatch(winner, loser):
     conn = connect()
     c = conn.cursor()
     # Inserts "winner_id" and "loser_id" into the table "matches"
-    c.execute("INSERT INTO matches (winner_id, loser_id) VALUES (%s,%s)", (winner, loser))
+    c.execute("INSERT INTO matches (winner_id, loser_id) VALUES (%s,%s)",
+              (winner, loser))
     conn.commit()
     conn.close()
 
@@ -127,29 +121,10 @@ def swissPairings():
     """
     conn = connect()
     c = conn.cursor()
-    """ This query makes three separate views; player_order, odd, and even.
-    Player_order sorts all the players according to their ranking and
-    gives them a row number, while Even and Odd create views from that
-    view which take every other player according to whether they have
-    odd or even row numbers and place them in those views in order
-    giving them a new number begining with 1. The query then joins
-    those two views based on the row number and returns two player
-    names and ids for each row."""
-    c.execute("CREATE or REPLACE VIEW player_order AS\
-    SELECT id, name, total_wins,\
-    row_number() over(order by total_wins) as game\
-    from standings;\
-    create or REPLACE view even as\
-    select id, name,\
-    row_number() over(order by game) as row\
-    from player_order\
-    where game % 2 = 0;\
-    create or REPLACE view odd as\
-    select id, name,\
-    row_number() over(order by game) as row\
-    from player_order\
-    where game % 2 != 0;\
-    SELECT even.id, even.name, odd.id, odd.name\
+    """ This query takes the views odd and even and gets the name and id of each
+    player and joining these two views on the row number to return the propper
+    tupples."""
+    c.execute(" SELECT even.id, even.name, odd.id, odd.name\
     from even\
     inner join odd on even.row = odd.row;\
     ")
